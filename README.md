@@ -40,6 +40,8 @@ Install dependencies : Run the following command to install all the dependencies
 
 Start the script : After the dependencies are installed, run the following command to start the app:
    node index.js
+   
+And add the images in the dataset folder, for the input.
 
 Give some time and enjoy the Magic to happen in the output folder!
 
