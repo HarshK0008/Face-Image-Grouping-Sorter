@@ -45,7 +45,7 @@ And add the images in the dataset folder, for the input.
 
 Give some time and enjoy the Magic to happen in the output folder!
 
-NOTE: Currently Images are sorted only if a persone exists in more than 2 images, you can change this condition tho, currently its just raw script, Working on it.
+NOTE: Currently Images are sorted only if a persone exists in more than 2 images, you can change this condition though, currently its just raw script, Working on it.
 
 ## Directory Structure
 
@@ -63,7 +63,7 @@ This project uses pre-trained models from  **face-api.js** . To ensure the model
 * **faceLandmark68Net** : For detecting facial landmarks
 * **faceRecognitionNet** : For generating face descriptors
 
-You can download the models from the official [face-api.js GitHub repository]() or use the models provided by the library.
+You can download the models from the official [face-api.js GitHub repository](https://github.com/justadudewhohacks/face-api.js) or use the models provided by the library.
 
 project-folder/
 │
