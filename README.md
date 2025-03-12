@@ -65,6 +65,11 @@ This project uses pre-trained models from  **face-api.js** . To ensure the model
 
 You can download the models from the official [face-api.js GitHub repository](https://github.com/justadudewhohacks/face-api.js) or use the models provided by the library.
 
+## Project Structure
+
+The project folder has the following structure:
+
+```plaintext
 project-folder/
 │
 ├── dataset/              # Place your images here
