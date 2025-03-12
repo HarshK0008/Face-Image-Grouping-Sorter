@@ -1,0 +1,127 @@
+const fs = require('fs');
+const path = require('path');
+const canvas = require('canvas');
+const faceapi = require('face-api.js');
+
+// Ensure face-api.js uses the node environment
+faceapi.env.monkeyPatch({ Canvas: canvas.Canvas, Image: canvas.Image, ImageData: canvas.ImageData });
+
+// Load the models (path to your models folder)
+const MODEL_PATH = path.join(__dirname, 'models');
+
+// Load models for face detection and recognition
+async function loadModels() {
+    console.log('Loading models...');
+    await faceapi.nets.ssdMobilenetv1.loadFromDisk(MODEL_PATH);
+    await faceapi.nets.faceLandmark68Net.loadFromDisk(MODEL_PATH);
+    await faceapi.nets.faceRecognitionNet.loadFromDisk(MODEL_PATH);
+    console.log('Models loaded successfully');
+}
+
+// Load and detect faces in an image
+async function detectFaces(imagePath) {
+    const image = await canvas.loadImage(imagePath);
+    const detections = await faceapi.detectAllFaces(image).withFaceLandmarks().withFaceDescriptors();
+    console.log(`Detected faces in image: ${imagePath}, Detections: ${detections.length}`);
+    return detections;
+}
+
+// Process the dataset to get labeled face descriptors
+async function processDataset() {
+    const imagesFolder = path.join(__dirname, 'dataset');
+    const imageFiles = fs.readdirSync(imagesFolder); // Get all image files in the dataset folder
+    const labeledFaces = [];
+
+    for (let imageFile of imageFiles) {
+        const imagePath = path.join(imagesFolder, imageFile);
+        console.log(`Detecting faces in image: ${imagePath}`);
+        const detections = await detectFaces(imagePath);
+
+        if (detections.length > 0) {
+            const faceDescriptors = detections.map((d) => d.descriptor);
+            const labeledFace = new faceapi.LabeledFaceDescriptors(imageFile, faceDescriptors);
+            labeledFaces.push(labeledFace);
+            console.log(`Face descriptors for ${imageFile} added.`);
+        } else {
+            console.log(`No faces detected in ${imageFile}`);
+        }
+    }
+    return labeledFaces;
+}
+
+// Group images by matching face descriptors
+async function groupFaces() {
+    const labeledFaces = await processDataset();
+    if (labeledFaces.length === 0) {
+        console.log('No labeled faces found, aborting the process.');
+        return;
+    }
+
+    // Create a FaceMatcher with all the labeled faces
+    const faceMatcher = new faceapi.FaceMatcher(labeledFaces, 0.2);
+    console.log('FaceMatcher created with threshold: 0.2');
+
+    // Initialize a map to group images by person
+    const groupedImages = new Map();
+
+    // Loop through each labeled face and match the face descriptors
+    labeledFaces.forEach(({ label, descriptors }) => {
+        descriptors.forEach((descriptor) => {
+            const bestMatch = faceMatcher.findBestMatch(descriptor);
+            console.log(`Matching ${label} with ${bestMatch.label}, distance: ${bestMatch.distance}`);
+            if (bestMatch.distance <= 0.2) { // Lowered threshold
+                const personName = bestMatch.label;
+                if (!groupedImages.has(personName)) {
+                    groupedImages.set(personName, []);
+                    console.log(`Created new group for ${personName}`);
+                }
+                groupedImages.get(personName).push(label);
+            }
+        });
+    });
+
+    console.log('Grouped images:', groupedImages);
+    await saveGroupedImages(groupedImages);
+}
+
+// Save grouped images into their respective folders
+async function saveGroupedImages(groupedImages) {
+    let personCount = 1;
+    groupedImages.forEach((images, personName) => {
+        if (images.length >= 2) {
+            const personFolder = path.join(__dirname, 'output', `person_${personCount}`);
+            if (!fs.existsSync(personFolder)) {
+                fs.mkdirSync(personFolder, { recursive: true });
+                console.log(`Folder created for person ID: ${personCount}`);
+            }
+
+            // Move images for this person into their folder
+            images.forEach((imagePath) => {
+                const fileName = path.basename(imagePath);
+                const sourcePath = path.join(__dirname, 'dataset', imagePath); // Ensure correct source path
+                const destinationPath = path.join(personFolder, fileName);
+
+                // Check if the source file exists before copying
+                if (fs.existsSync(sourcePath)) {
+                    fs.copyFileSync(sourcePath, destinationPath);
+                    console.log(`Image ${fileName} copied to ${destinationPath}`);
+                } else {
+                    console.error(`Source file ${sourcePath} does not exist.`);
+                }
+            });
+
+            console.log(`Images for person ID: ${personCount} sorted into folder.`);
+            personCount++; // Increment the person ID
+        } else {
+            console.log(`Person with less than 5 images: ${personName}, skipping.`);
+        }
+    });
+}
+
+// Main function
+async function main() {
+    await loadModels(); // Load models first
+    await groupFaces(); // Group faces and sort images into folders
+}
+
+main().catch(console.error);

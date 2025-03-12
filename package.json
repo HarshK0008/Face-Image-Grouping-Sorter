@@ -1,0 +1,21 @@
+{
+  "name": "face-recognition-sorting",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@tensorflow/tfjs-core": "^4.22.0",
+    "canvas": "^3.1.0",
+    "dotenv": "^16.4.7",
+    "face-api.js": "^0.22.2",
+    "fs": "^0.0.1-security",
+    "sharp": "^0.33.5"
+  }
+}
