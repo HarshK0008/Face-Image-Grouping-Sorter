@@ -30,7 +30,20 @@ npm install sharp@^0.33.5
 
 `npm install @tensorflow/tfjs-core@^4.22.0 canvas@^3.1.0 dotenv@^16.4.7 face-api.js@^0.22.2 fs@^0.0.1-security sharp@^0.33.5 `
 
+Or Start from here:
 
+Clone the repository : Clone the repository from the GitHub link to your local machine or code editor.
+Clone the Repo: git clone <repository-url>
+
+Install dependencies : Run the following command to install all the dependencies:
+   npm install
+
+Start the script : After the dependencies are installed, run the following command to start the app:
+   node index.js
+
+Give some time and enjoy the Magic to happen in the output folder!
+
+NOTE: Currently Images are sorted only if a persone exists in more than 2 images, you can change this condition tho, currently its just raw script, Working on it.
 
 ## Directory Structure
 
