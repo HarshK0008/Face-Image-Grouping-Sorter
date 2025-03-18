@@ -1,127 +1,223 @@
-const fs = require('fs');
-const path = require('path');
-const canvas = require('canvas');
-const faceapi = require('face-api.js');
+// Single threshold and Multi threshold using array for comparing between a range.
 
-// Ensure face-api.js uses the node environment
-faceapi.env.monkeyPatch({ Canvas: canvas.Canvas, Image: canvas.Image, ImageData: canvas.ImageData });
 
-// Load the models (path to your models folder)
-const MODEL_PATH = path.join(__dirname, 'models');
+const fs = require("fs");
+const path = require("path");
+const faceapi = require("face-api.js");
+const canvas = require("canvas");
 
-// Load models for face detection and recognition
+// Canvas provides server like enviornment to the face-api.js to work
+const { Canvas, Image, ImageData } = canvas;
+faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
+
+// Load the models from models folder for the face-api.js to use to read the images.
 async function loadModels() {
-    console.log('Loading models...');
-    await faceapi.nets.ssdMobilenetv1.loadFromDisk(MODEL_PATH);
-    await faceapi.nets.faceLandmark68Net.loadFromDisk(MODEL_PATH);
-    await faceapi.nets.faceRecognitionNet.loadFromDisk(MODEL_PATH);
-    console.log('Models loaded successfully');
+	console.log("Loading models...");
+	await faceapi.nets.ssdMobilenetv1.loadFromDisk("./models");
+	await faceapi.nets.faceLandmark68Net.loadFromDisk("./models");
+	await faceapi.nets.faceRecognitionNet.loadFromDisk("./models");
+	console.log("Models loaded.");
 }
 
-// Load and detect faces in an image
-async function detectFaces(imagePath) {
-    const image = await canvas.loadImage(imagePath);
-    const detections = await faceapi.detectAllFaces(image).withFaceLandmarks().withFaceDescriptors();
-    console.log(`Detected faces in image: ${imagePath}, Detections: ${detections.length}`);
-    return detections;
+// Function to extract face descriptors from images (Image data in high-dimensional vector)
+async function extractFaceDescriptors(images) {
+	const faceDescriptors = [];
+
+	for (const imagePath of images) {
+		try {
+			const image = await canvas.loadImage(imagePath); // Using canvas.loadImage from 'canvas' library
+			const detections = await faceapi.detectAllFaces(image).withFaceLandmarks().withFaceDescriptors();
+
+			if (detections.length > 0) {
+				faceDescriptors.push({
+					image: imagePath,
+					descriptor: detections[0].descriptor, // Take the first face's descriptor
+				});
+				console.log(`Face descriptors for ${path.basename(imagePath)} added.`);
+			} else {
+				console.log(`No faces detected in ${path.basename(imagePath)}.`);
+			}
+		} catch (error) {
+			console.error(`Error processing image ${imagePath}:`, error);
+		}
+	}
+
+	console.log(`Extracted descriptors for ${faceDescriptors.length} images.`);
+	return faceDescriptors;
 }
 
-// Process the dataset to get labeled face descriptors
-async function processDataset() {
-    const imagesFolder = path.join(__dirname, 'dataset');
-    const imageFiles = fs.readdirSync(imagesFolder); // Get all image files in the dataset folder
-    const labeledFaces = [];
-
-    for (let imageFile of imageFiles) {
-        const imagePath = path.join(imagesFolder, imageFile);
-        console.log(`Detecting faces in image: ${imagePath}`);
-        const detections = await detectFaces(imagePath);
-
-        if (detections.length > 0) {
-            const faceDescriptors = detections.map((d) => d.descriptor);
-            const labeledFace = new faceapi.LabeledFaceDescriptors(imageFile, faceDescriptors);
-            labeledFaces.push(labeledFace);
-            console.log(`Face descriptors for ${imageFile} added.`);
-        } else {
-            console.log(`No faces detected in ${imageFile}`);
-        }
-    }
-    return labeledFaces;
+// Function to compare face descriptors
+function compareFaceDescriptors(descriptor1, descriptor2) {
+	const distance = faceapi.euclideanDistance(descriptor1, descriptor2);
+	console.log(`Comparing descriptors: distance = ${distance}`);
+	return distance;
 }
 
-// Group images by matching face descriptors
-async function groupFaces() {
-    const labeledFaces = await processDataset();
-    if (labeledFaces.length === 0) {
-        console.log('No labeled faces found, aborting the process.');
-        return;
-    }
+//! Single threshold for comparison "WORKING" efficiently.
+// Function to group images based on face similarity
+// async function groupImages(faceDescriptors) {
+// 	const groups = []; // This will hold our image groups
+// 	const threshold = 0.2;
+// 	console.log("Grouping images...");
 
-    // Create a FaceMatcher with all the labeled faces
-    const faceMatcher = new faceapi.FaceMatcher(labeledFaces, 0.2);
-    console.log('FaceMatcher created with threshold: 0.2');
+// 	// Loop through each face descriptor and compare it with all others
+// 	for (let i = 0; i < faceDescriptors.length; i++) {
+// 		const currentFace = faceDescriptors[i];
+// 		let groupFound = false;
+// 		console.log(`Checking face ${i + 1} (${path.basename(currentFace.image)})...`);
 
-    // Initialize a map to group images by person
-    const groupedImages = new Map();
+// 		// Check the current face descriptor against all previously checked groups
+// 		for (let j = 0; j < groups.length; j++) {
+// 			const group = groups[j];
+// 			const firstFaceDescriptor = faceDescriptors[group[0]].descriptor;
+// 			const distance = compareFaceDescriptors(currentFace.descriptor, firstFaceDescriptor);
 
-    // Loop through each labeled face and match the face descriptors
-    labeledFaces.forEach(({ label, descriptors }) => {
-        descriptors.forEach((descriptor) => {
-            const bestMatch = faceMatcher.findBestMatch(descriptor);
-            console.log(`Matching ${label} with ${bestMatch.label}, distance: ${bestMatch.distance}`);
-            if (bestMatch.distance <= 0.2) { // Lowered threshold
-                const personName = bestMatch.label;
-                if (!groupedImages.has(personName)) {
-                    groupedImages.set(personName, []);
-                    console.log(`Created new group for ${personName}`);
-                }
-                groupedImages.get(personName).push(label);
-            }
-        });
-    });
+// 			// Log the distance for better visibility
+// 			console.log(
+// 				`Distance between ${path.basename(currentFace.image)} and ${path.basename(
+// 					faceDescriptors[group[0]].image
+// 				)}: ${distance}`
+// 			);
 
-    console.log('Grouped images:', groupedImages);
-    await saveGroupedImages(groupedImages);
+// 			if (distance < threshold) {
+// 				console.log(`Adding ${path.basename(currentFace.image)} to group ${j} (distance = ${distance})`);
+// 				group.push(i); // If the current face is similar to the group, add to that group
+// 				groupFound = true;
+// 				break;
+// 			}
+// 		}
+
+// 		// If no group was found, create a new group for this image
+// 		if (!groupFound) {
+// 			console.log(`Creating a new group for ${path.basename(currentFace.image)}`);
+// 			groups.push([i]); // Start a new group with the current face
+// 		}
+// 	}
+
+// 	console.log(`Grouping completed. Total groups: ${groups.length}`);
+// 	return groups;
+// }
+
+// Function to group images based on multiple face similarity thresholds
+async function groupImages(faceDescriptors) {
+	const groups = []; // This will hold our image groups
+	const looseThreshold = 0.5; // Loose threshold for grouping
+	const tightThreshold = 0.3; // Tight threshold for grouping
+	console.log("Grouping images...");
+
+	// Loop through each face descriptor and compare it with all others
+	for (let i = 0; i < faceDescriptors.length; i++) {
+		const currentFace = faceDescriptors[i];
+		let groupFound = false;
+		console.log(`Checking face ${i + 1} (${path.basename(currentFace.image)})...`);
+
+		// Check the current face descriptor against all previously checked groups
+		for (let j = 0; j < groups.length; j++) {
+			const group = groups[j];
+			const firstFaceDescriptor = faceDescriptors[group[0]].descriptor;
+
+			// First try using the loose threshold
+			const looseDistance = compareFaceDescriptors(currentFace.descriptor, firstFaceDescriptor);
+			console.log(
+				`Loose threshold: Distance between ${path.basename(currentFace.image)} and ${path.basename(
+					faceDescriptors[group[0]].image
+				)}: ${looseDistance}`
+			);
+
+			// If the loose threshold is met, add to the group and stop checking further thresholds
+			if (looseDistance < looseThreshold) {
+				console.log(`Adding ${path.basename(currentFace.image)} to group ${j} (loose threshold match)`);
+				group.push(i);
+				groupFound = true;
+				break; // No need to check the tight threshold for this group
+			}
+
+			// If loose threshold doesn't match, try the tight threshold
+			const tightDistance = compareFaceDescriptors(currentFace.descriptor, firstFaceDescriptor);
+			console.log(
+				`Tight threshold: Distance between ${path.basename(currentFace.image)} and ${path.basename(
+					faceDescriptors[group[0]].image
+				)}: ${tightDistance}`
+			);
+
+			// If the tight threshold is met, add to the group
+			if (tightDistance < tightThreshold) {
+				console.log(`Adding ${path.basename(currentFace.image)} to group ${j} (tight threshold match)`);
+				group.push(i);
+				groupFound = true;
+				break; // No need to check further thresholds for this group
+			}
+		}
+
+		// If no group was found with either threshold, create a new group for this image
+		if (!groupFound) {
+			console.log(`Creating a new group for ${path.basename(currentFace.image)}`);
+			groups.push([i]); // Start a new group with the current face
+		}
+	}
+
+	console.log(`Grouping completed. Total groups: ${groups.length}`);
+	return groups;
 }
 
-// Save grouped images into their respective folders
-async function saveGroupedImages(groupedImages) {
-    let personCount = 1;
-    groupedImages.forEach((images, personName) => {
-        if (images.length >= 2) {
-            const personFolder = path.join(__dirname, 'output', `person_${personCount}`);
-            if (!fs.existsSync(personFolder)) {
-                fs.mkdirSync(personFolder, { recursive: true });
-                console.log(`Folder created for person ID: ${personCount}`);
-            }
+// Function to organize images into directories
+async function organizeImages(groups, faceDescriptors) {
+	const outputDir = "./output";
 
-            // Move images for this person into their folder
-            images.forEach((imagePath) => {
-                const fileName = path.basename(imagePath);
-                const sourcePath = path.join(__dirname, 'dataset', imagePath); // Ensure correct source path
-                const destinationPath = path.join(personFolder, fileName);
+	// Create the output directory if it doesn't exist
+	if (!fs.existsSync(outputDir)) {
+		fs.mkdirSync(outputDir);
+	}
 
-                // Check if the source file exists before copying
-                if (fs.existsSync(sourcePath)) {
-                    fs.copyFileSync(sourcePath, destinationPath);
-                    console.log(`Image ${fileName} copied to ${destinationPath}`);
-                } else {
-                    console.error(`Source file ${sourcePath} does not exist.`);
-                }
-            });
+	console.log("Organizing images into directories...");
 
-            console.log(`Images for person ID: ${personCount} sorted into folder.`);
-            personCount++; // Increment the person ID
-        } else {
-            console.log(`Person with less than 5 images: ${personName}, skipping.`);
-        }
-    });
+	// Iterate over the grouped images and move them into person-specific directories
+	for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+		const group = groups[groupIndex];
+
+		// Skip groups with less than 2 images
+		if (group.length < 2) {
+			console.log(`Skipping group ${groupIndex} - less than 2 images found.`);
+			continue;
+		}
+
+		// Create a directory for this group/person
+		const personDir = path.join(outputDir, `person_${groupIndex}`);
+		if (!fs.existsSync(personDir)) {
+			fs.mkdirSync(personDir);
+		}
+
+		// Copy images to the new directory
+		for (const index of group) {
+			const imagePath = faceDescriptors[index].image;
+			const destPath = path.join(personDir, path.basename(imagePath));
+			fs.copyFileSync(imagePath, destPath);
+			console.log(`Image ${path.basename(imagePath)} copied to ${personDir}`);
+		}
+
+		console.log(`Images for group ${groupIndex} sorted into folder.`);
+	}
 }
 
-// Main function
-async function main() {
-    await loadModels(); // Load models first
-    await groupFaces(); // Group faces and sort images into folders
+// Main function to handle image sorting
+async function sortImages(images) {
+	console.log("Starting image sorting...");
+
+	// Load models and process face descriptors
+	await loadModels();
+	const faceDescriptors = await extractFaceDescriptors(images);
+
+	// Group images based on face descriptors
+	const groups = await groupImages(faceDescriptors);
+
+	// Organize images into directories
+	await organizeImages(groups, faceDescriptors);
+
+	console.log("Image sorting completed.");
 }
 
-main().catch(console.error);
+// Example usage:
+const imagesDir = "./dataset"; // Directory containing your images
+const images = fs.readdirSync(imagesDir).map((file) => path.join(imagesDir, file));
+
+sortImages(images).catch((err) => console.error(err));

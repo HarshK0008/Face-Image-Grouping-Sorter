@@ -16,8 +16,7 @@ You will also need the following NPM packages:
 - **dotenv**: To manage environment variables
 - **face-api.js**: Library for face detection and recognition
 - **fs**: File system module to handle file operations
-- **sharp**: High-performance image processing
-  ### Install them one-by-one or use the other command provided below:
+- **sharp**: High-performance image processing### Install them one-by-one or use the other command provided below:
 
 ```
 npm install @tensorflow/tfjs-core@^4.22.0
@@ -33,14 +32,14 @@ npm install sharp@^0.33.5
 Or Start from here:
 
 Clone the repository : Clone the repository from the GitHub link to your local machine or code editor.
-Clone the Repo: git clone <repository-url>
+Clone the Repo: git clone `<repository-url>`
 
 Install dependencies : Run the following command to install all the dependencies:
    npm install
 
 Start the script : After the dependencies are installed, run the following command to start the app:
    node index.js
-   
+
 And add the images in the dataset folder, for the input.
 
 Give some time and enjoy the Magic to happen in the output folder!
@@ -153,4 +152,5 @@ Follow these steps to run the project:
 * **Model loading errors** : Ensure the model files are correctly placed in the `./models/` directory.
 * **Missing dependencies** : Ensure you have installed all the necessary dependencies as outlined in the **Install dependencies** section.
 * Try Adjusting the thresold in range between 0-1 in float value "0.1" for more accuracy 0.9 for loose grouping of images.
-* 0.3 for accurate accuracy of grouping images; 0.5 for the balanced grouping of images both works good.or use the multi-threshold by giving a range of threshold for grouping the threshold if you want to get desired results. i.e const thresholds = [0.3, 0.5]
+* 0.3 for accurate accuracy of grouping images; 0.5 for the balanced grouping of images both works good or use the multi-threshold by giving a range of threshold for grouping the threshold if you want to get desired results. i.e const thresholds = [0.3, 0.5]
+```
